@@ -29,7 +29,11 @@ to_pvi <- pvi %>%
     ) %>%
   drop_na(Consecuencia) %>%
   filter(grepl("OCULAR", Consecuencia)) %>%
-  select(-4)
+  select(-4) %>%
+  separate(Rut, into = c("Rut", "DV"), sep = "-") %>%
+  select(Rut) %>%
+  filter(Rut != "SIN DATO") %>%
+  drop_na(Rut) %>% unique()
 
 
 #### Guardado de bases de datos ####

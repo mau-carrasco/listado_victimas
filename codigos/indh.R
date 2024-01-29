@@ -37,20 +37,17 @@ homicidio_indh <- indh %>%
   filter(!grepl("ocular", Consecuencia))
 
 # Listado de víctimas de trauma ocular
-to_indh <- indh %>%
-  filter(
-    Consecuencia %in% c(
-      "Lesión causada por trauma ocular",
-      "Estallido de globo ocular",
-      "Pérdida de visión por trauma ocular irreversible")
-    ) %>%
-  select(Region,
-         Nombre,
-         Rut = RUT,
-         Sexo,
-         Edad,
-         Delito = `Figura juridica invocada`,
-         Consecuencia)
+to_indh <- unique(indh %>%
+         filter(
+           Consecuencia %in% c(
+             "Lesión causada por trauma ocular",
+             "Estallido de globo ocular",
+             "Pérdida de visión por trauma ocular irreversible")
+         ) %>%
+         select(Rut = RUT) %>%
+         drop_na()) %>%
+  separate(Rut, into = c("Rut", "DV"), sep = "-") %>%
+  select(!DV)
 
 
 #### Guardado de bases de datos ####

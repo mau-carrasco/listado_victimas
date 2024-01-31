@@ -100,13 +100,17 @@ sexta_observacion <- to_consolidado %>%
 septima_observacion <- to_consolidado %>%
   summarise(INDH = 1, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 1]))
 
-historial_capturas <- rbind(primera_observacion,
+historial_capturas <- rbind(
+  nula_observacion,
+  primera_observacion,
       segunda_observacion,
       tercera_observacion,
       cuarta_observacion,
       quinta_observacion,
       sexta_observacion,
       septima_observacion)
+
+write.csv(historial_capturas, "resultados/historial_capturas.csv")
 
 library(Rcapture)
 result <- closedpMS.t(historial_capturas, dfreq=TRUE)

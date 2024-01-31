@@ -6,25 +6,132 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-
+knitr::opts_chunk$set(echo = F)
+library(tidyverse)
 library(readxl)
+library(ggvenn)
+to_indh <- read_excel("resultados/to_indh.xlsx")
+to_pvi <- read_excel("resultados/to_pvi.xlsx")
+to_pacto <- read_excel("resultados/to_pacto.xlsx")
 estimacion_pob_to <- read_excel("resultados/estimacion_pob_to.xlsx")
+#### Consolidado ####
+
+# Listado de ruts de víctimas de trauma ocular registradas en querellas del INDH, atenciones del PVI y atenciones de PACTO
+to_consolidado <- to_indh %>%
+  select(Rut) %>%
+  full_join(to_pvi %>% select(Rut)) %>%
+  full_join(to_pacto %>% select(Rut))
+
+to_pvi$pvi <- 1
+to_indh$indh <- 1
+to_pacto$pacto <- 1
+
+to_consolidado <- to_consolidado %>%
+  left_join(to_pacto) %>%
+  left_join(to_pvi) %>%
+  left_join(to_indh) %>%
+  replace(is.na(.), 0)
+
+to_consolidado <- to_consolidado[-110,]
+
+to_consolidado <- to_consolidado %>%
+  group_by(Rut) %>%
+  summarise(
+    pacto = max(pacto),
+    indh = max(indh),
+    pvi = max(pvi)
+    ) %>%
+  ungroup()
+
+to_consolidado$Rut <- as.numeric(to_consolidado$Rut)
+to_consolidado <- as.data.frame(to_consolidado)
+
+
+
 ```
 
-## Listas
+## Introducción
 
-Para confeccionar el catastro de víctimas de disparon con resultado de trauma ocular se utilizaron tres fuentes de datos independientes:
+El presente documento contiene los resultados del estudio solicitado por la Subsecretaría de Derechos Humanos para estimar la población de víctimas de violaciones a los derechos humanos con resultado de trauma ocular, durante el estallido social (octubre 2019 a marzo 2020)
 
-- Víctimas en querellas del INDH: Listado de víctimas de disparos con resultado de trauma ocular registradas en las acciones de amparo y querellas criminales interpuestas por el Instituto Nacional de Derechos Humanos (PVI) entre el 18 de octubre de 2019 y el 20 de marzo de 2020
+## Listados con el registro de víctimas de trauma ocular
 
-- Víctimas en atenciones del PVI: Listado de víctimas de disparos con resultado de trauma ocularque registran atenciones en el Programa de Violencia Institucional de Subsecretaría de Derechos Humanos al 30 de noviembre de 2023
+Para confeccionar el catastro y estimar la población de víctimas de disparos con resultado de trauma ocular se utilizaron tres fuentes de información independientes:
 
-- Víctimas en atenciones en el PACTO: Listado de víctimas de disparon resultado de trauma ocular que registran atenciones en el Plan de Acompañamiento y Cuidado de Víctimas de Trauma Ocular, Lesiones Graves y Lesionados por Perdigones (PACTO) al 30 de octubre de 2023
+- **Víctimas en querellas del INDH:** Listado de víctimas de disparos con resultado de trauma ocular registradas en las acciones de amparo y querellas criminales interpuestas por el Instituto Nacional de Derechos Humanos (PVI) entre el 18 de octubre de 2019 y el 20 de marzo de 2020. Este listado contiene un total de 152 víctimas de las cuales XX% son personas de sexo masculino y el XX% son personas de sexo femenino. La edad actual de las víctimas de trauma ocular consignadas en querellas y acciones judiciales del INDH ascila entre los YY y los ZZ años de edad, alcanzando un promedio de WW años.
 
-![Texto alternativo](~/GitHub/listado_victimas/resultados/diagrama_to.png)
+- **Víctimas en atenciones del PVI:** Listado de víctimas de disparos con resultado de trauma ocular que registran atenciones en el Programa de Violencia Institucional de Subsecretaría de Derechos Humanos al 30 de noviembre de 2023. Este listado está compuesto por 101 víctimas, de las cuales XX son personas de sexo masculino y el XX% son personas de sexo femenino. La edad actual de las víctimas de trauma ocular atendidas por el PVI ascila entre los YY y los ZZ años de edad, alcanzando un promedio de WW años.
+
+- **Víctimas en atenciones en el PACTO:** Listado de víctimas de disparos resultado de trauma ocular que registran atenciones en el Plan de Acompañamiento y Cuidado de Víctimas de Trauma Ocular, Lesiones Graves y Lesionados por Perdigones (PACTO) al 30 de octubre de 2023. Este listado está conformado por 360 víctimas registradas como usuarios activos e inactivos del programa, de las cuales XX son personas de sexo masculino y xx son personas de sexo femenino. La edad actual de las víctimas de trauma ocular que figuran como usuarios activos e inactivos del PACTO oscila entre los YY y los ZZ años de edad, alcanzando un promedio de ww años.
+
+## Registro consolidado de víctimas de trauma ocular
+
+Para construir el registro consolidado, se construyó una base de datos que integra los listados parciales de víctimas de trauma ocular que hacen referencia a los mismo elementos de la población, vinculándolos a través de conglomerados estadísticos. 
+
+Esta base de datos consta de tres columnas o variables que indican la presencia o ausencia de las víctimas en los listados ya mencionados (1 si la víctima está presente en el listado y 0 si la víctima no está presente). Cada fila cuenta todos los registros que tienen un determinado "historial de captura", es decir, cuenta todas las víctimas que han sido observadas y no observadas en los listados del INDH, el PVI y el PACTO. La primera fila [0,0,0] describe el número de víctimas de trauma ocular que no han sido registradas por el INDH, el PVI y el PACTO. Cómo se desconoce el número de víctimas no catastrada por las instituciones, se asignó el valor NA a la frecuencia observada. La segunda fila [1,0,0] registra el recuento de traumas oculares que sólo están registrados por el INDH, y no por el PVI y el PACTO: 53 víctimas. Las filas siguientes hacen los mismo, salvo la última [1,1,1,1], que registras y recuenta el número de víctimas de trauma ocular observadas en los tres listados: 37 vícimas.
 
 ```{r}
-kableExtra::kable(estimacion_pob_to[,-1], booktabs = T)
+nula_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 0, PACTO = 0, Freq = NA)
+primera_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 0, PACTO = 0, Freq = sum(indh[pvi == 0 & pacto == 0]))
+segunda_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 1, PACTO = 0, Freq = sum(pvi[indh == 0 & pacto == 0]))
+tercera_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 1, PACTO = 0, Freq = sum(pvi[indh == 1 & pacto == 0]))
+cuarta_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 0, PACTO = 1, Freq = sum(pacto[indh == 0 & pvi == 0]))
+quinta_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 0, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 0]))
+sexta_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 0 & pvi == 1]))
+septima_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 1]))
+
+historial_capturas <- rbind(nula_observacion,
+                            primera_observacion,
+      segunda_observacion,
+      tercera_observacion,
+      cuarta_observacion,
+      quinta_observacion,
+      sexta_observacion,
+      septima_observacion)
+
+kableExtra::kable(historial_capturas, booktabs = T, caption = "Historial del registro de víctimas de trauma ocular") %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::footnote(general = "INDH, PVI y PACTO",
+                       general_title = "Fuente:")
+```
+
+La base de datos, registra un total de 440 víctimas catastradas, que se distribuyen de la siguiente manera entre los listados:
+
+```{r fig.cap="Diagrama de Venn del registro de víctimas de trauma ocular", fig.height=3.5, fig.width=7}
+# Diagrama de Venn con el registro de casos de trauma ocular
+ggvenn(
+  list(`INDH` = unique(to_indh$Rut),
+       `PVI` = unique(to_pvi$Rut),
+       `PACTO` = unique(to_pacto$Rut)),
+  set_name_size = 4) +
+  theme(text = element_text(size = 2))
+
+```
+
+## Estimación del número de víctimas de trauma ocular
+
+La estimación de la población de víctimas
+
+```{r}
+options(knitr.kable.NA = '')
+kableExtra::kable(
+  estimacion_pob_to[,-1],
+  booktabs = T,
+  caption = "Estimación de la población de víctimas de trauma ocular por método de comparación múltiple (Chapman)",
+  col.names = c("Comparación", "Población estimada", "IC 95% inf", "IC 95% sup")) %>%
+  kableExtra::kable_styling(latex_options = "HOLD_position") %>%
+  kableExtra::footnote(general = "INDH, PVI y PACTO",
+                       general_title = "Fuente:",
+                       number = c("La fila resaltada muestra el resultado más confiable"),
+                       number_title = "Nota:") %>%
+  kableExtra::row_spec(6, bold = T, color = "black", background = "gray")
 ```
 

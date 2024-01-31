@@ -1,0 +1,30 @@
+---
+title: "Traumas oculares"
+author: "Jorge Vega"
+date: "2024-01-30"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(readxl)
+estimacion_pob_to <- read_excel("resultados/estimacion_pob_to.xlsx")
+```
+
+## Listas
+
+Para confeccionar el catastro de víctimas de disparon con resultado de trauma ocular se utilizaron tres fuentes de datos independientes:
+
+- Víctimas en querellas del INDH: Listado de víctimas de disparos con resultado de trauma ocular registradas en las acciones de amparo y querellas criminales interpuestas por el Instituto Nacional de Derechos Humanos (PVI) entre el 18 de octubre de 2019 y el 20 de marzo de 2020
+
+- Víctimas en atenciones del PVI: Listado de víctimas de disparos con resultado de trauma ocularque registran atenciones en el Programa de Violencia Institucional de Subsecretaría de Derechos Humanos al 30 de noviembre de 2023
+
+- Víctimas en atenciones en el PACTO: Listado de víctimas de disparon resultado de trauma ocular que registran atenciones en el Plan de Acompañamiento y Cuidado de Víctimas de Trauma Ocular, Lesiones Graves y Lesionados por Perdigones (PACTO) al 30 de octubre de 2023
+
+![Texto alternativo](~/GitHub/listado_victimas/resultados/diagrama_to.png)
+
+```{r}
+kableExtra::kable(estimacion_pob_to[,-1], booktabs = T)
+```
+

@@ -5,7 +5,7 @@
 #### Preámbulo  ####
 
 # Directorio de trabajo
-setwd("C:/Users/mauricio.carrasco/Desktop/estallido_social/")
+setwd("~/GitHub/listado_victimas/")
 
 # carga de paquetes
 library(tidyverse)
@@ -42,13 +42,12 @@ to_consolidado <- to_consolidado[-110,]
 to_consolidado <- to_consolidado %>%
   group_by(Rut) %>%
   summarise(
+    pvi = max(pvi),
     pacto = max(pacto),
     indh = max(indh),
-    pvi = max(pvi)
     ) %>%
   ungroup()
 
-to_consolidado$Rut <- as.numeric(to_consolidado$Rut)
 to_consolidado <- as.data.frame(to_consolidado)
 
 #### Análisis descriptivo de los listados ###
@@ -69,10 +68,12 @@ ggvenn(
 
 #### Estimación poblacional ####
 
-estimacion_1 <- capHistSum(to_consolidado[,-1])
+estimacion_1 <- capHistSum(to_consolidado[,2:4])
 estimacion_1$sum
 
-summary(mrClosed(estimacion_1))
+mrClosed(estimacion_1, "Schnabel")
+
+summary(mrClosed(estimacion_1, "Schnabel"))
 confint(mrClosed(estimacion_1))
 
 tabla_1 <- data.frame(summary(mrClosed(estimacion_1)),
@@ -80,3 +81,51 @@ tabla_1 <- data.frame(summary(mrClosed(estimacion_1)),
 
 tabla_1[-4,] %>%
   kableExtra::kbl()
+
+
+nula_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 0, PACTO = 0, Freq = NA)
+primera_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 0, PACTO = 0, Freq = sum(indh[pvi == 0 & pacto == 0]))
+segunda_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 1, PACTO = 0, Freq = sum(pvi[indh == 0 & pacto == 0]))
+tercera_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 1, PACTO = 0, Freq = sum(pvi[indh == 1 & pacto == 0]))
+cuarta_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 0, PACTO = 1, Freq = sum(pacto[indh == 0 & pvi == 0]))
+quinta_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 0, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 0]))
+sexta_observacion <- to_consolidado %>%
+  summarise(INDH = 0, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 0 & pvi == 1]))
+septima_observacion <- to_consolidado %>%
+  summarise(INDH = 1, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 1]))
+
+historial_capturas <- rbind(primera_observacion,
+      segunda_observacion,
+      tercera_observacion,
+      cuarta_observacion,
+      quinta_observacion,
+      sexta_observacion,
+      septima_observacion)
+
+library(Rcapture)
+result <- closedpMS.t(historial_capturas, dfreq=TRUE)
+print(result)
+
+
+library(SparseMSE)
+estimatepopulation(historial_capturas, nboot = 1000, pthresh = 0.02,
+                   alpha = c(0.01, 0.05, 0.1))
+checkident(historial_capturas, mX = NULL, verbose = T)
+
+descriptive(to_consolidado[,-1], dfreq = T, dtype=c("hist","nbcap"))
+
+modelos <- Rcapture::closedp(
+  to_consolidado[,-1]
+)
+
+modelos <- as.data.frame(modelos$results)
+
+historial_capturas
+
+closedp.bc(to_consolidado[,-1], m=c("M0","Mbh"))

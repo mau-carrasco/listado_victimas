@@ -5,7 +5,7 @@
 #### Preámbulo  ####
 
 # Directorio de trabajo
-setwd("C:/Users/mauricio.carrasco/Desktop/estallido_social/")
+setwd("~/GitHub/listado_victimas/")
 
 # carga de paquetes
 library(tidyverse)

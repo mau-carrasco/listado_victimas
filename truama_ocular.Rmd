@@ -132,6 +132,6 @@ kableExtra::kable(
                        general_title = "Fuente:",
                        number = c("La fila resaltada muestra el resultado más confiable"),
                        number_title = "Nota:") %>%
-  kableExtra::row_spec(6, bold = T, color = "black", background = "gray")
+  kableExtra::row_spec(6, bold = T, color = "black")
 ```
 

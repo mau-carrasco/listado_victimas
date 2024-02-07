@@ -42,9 +42,9 @@ to_consolidado <- to_consolidado[-110,]
 to_consolidado <- to_consolidado %>%
   group_by(Rut) %>%
   summarise(
-    pvi = max(pvi),
     pacto = max(pacto),
     indh = max(indh),
+    pvi = max(pvi)
     ) %>%
   ungroup()
 
@@ -66,70 +66,75 @@ ggvenn(
         plot.subtitle = element_text(hjust = 0.5)) +
   ggsave("resultados/diagrama_to.png", width = 6, height = 6)
 
-#### Estimación poblacional ####
-
-estimacion_1 <- capHistSum(to_consolidado[,2:4])
-estimacion_1$sum
-
-mrClosed(estimacion_1, "Schnabel")
-
-summary(mrClosed(estimacion_1, "Schnabel"))
-confint(mrClosed(estimacion_1))
-
-tabla_1 <- data.frame(summary(mrClosed(estimacion_1)),
-           confint(mrClosed(estimacion_1)))
-
-tabla_1[-4,] %>%
-  kableExtra::kbl()
-
-
-nula_observacion <- to_consolidado %>%
-  summarise(INDH = 0, PVI = 0, PACTO = 0, Freq = NA)
-primera_observacion <- to_consolidado %>%
-  summarise(INDH = 1, PVI = 0, PACTO = 0, Freq = sum(indh[pvi == 0 & pacto == 0]))
-segunda_observacion <- to_consolidado %>%
-  summarise(INDH = 0, PVI = 1, PACTO = 0, Freq = sum(pvi[indh == 0 & pacto == 0]))
-tercera_observacion <- to_consolidado %>%
-  summarise(INDH = 1, PVI = 1, PACTO = 0, Freq = sum(pvi[indh == 1 & pacto == 0]))
-cuarta_observacion <- to_consolidado %>%
-  summarise(INDH = 0, PVI = 0, PACTO = 1, Freq = sum(pacto[indh == 0 & pvi == 0]))
-quinta_observacion <- to_consolidado %>%
-  summarise(INDH = 1, PVI = 0, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 0]))
-sexta_observacion <- to_consolidado %>%
-  summarise(INDH = 0, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 0 & pvi == 1]))
-septima_observacion <- to_consolidado %>%
-  summarise(INDH = 1, PVI = 1, PACTO = 1, Freq = sum(pacto[indh == 1 & pvi == 1]))
-
-historial_capturas <- rbind(
-  nula_observacion,
-  primera_observacion,
-      segunda_observacion,
-      tercera_observacion,
-      cuarta_observacion,
-      quinta_observacion,
-      sexta_observacion,
-      septima_observacion)
-
-write.csv(historial_capturas, "resultados/historial_capturas.csv")
-
 library(Rcapture)
-result <- closedpMS.t(historial_capturas, dfreq=TRUE)
-print(result)
+descriptivos <- descriptive(to_consolidado[,-1], dfreq = F, dtype = "hist")
+plot(descriptivos)
+indicadores <- capHistSum(to_consolidado[,-1])$sum %>%
+  select(1:2,4)
+m1 <- mrClosed(n = indicadores$n, m = indicadores$m, M = indicadores$M,
+         method="Chapman")
+
+m2 <- mrClosed(n = indicadores$n, m = indicadores$m, M = indicadores$M,
+               method="Schnabel")
+
+cbind(summary(m2,incl.SE=TRUE),confint(m2))
+
+chapman_comparacion <- cbind(summary(m1,incl.SE=TRUE),confint(m1))
+chapman_comparacion <- chapman_comparacion %>%
+  data.frame()
+chapman_comparacion$Comparacion <- c("PACTO", "PACTO + INDH", "PACTO + INDH + PVI", NA)
+chapman_comparacion <- chapman_comparacion %>% select(5, 1:4)
+rempsyc::nice_table(chapman_comparacion %>% drop_na(),
+                    title = "Tabla 1. Estimación población de víctima de violaciones de derechos humanos con resultado de trauma ocular por método de comparación múltiple de Chapman",
+                    note = c("",
+                             "Los límites superiores e inferiores del intervalo de cada estimación fueron calculados para un 95% de confianza."))
+
+modelos <- closedp.t(to_consolidado[,-1], dfreq = F, neg = T)
+
+mat <- histpos.t(3)
+mX1 <- mat
+mc1 <- closedp.mX(to_consolidado[,-1], dfreq = F, mX = mX1, mname = "Sin interación")
+summary(mc1$glm)
+
+mX2 <- cbind(mat,mat[, 1] * mat[, 2])
+mc2 <- closedp.mX(to_consolidado[,-1], dfreq = F, mX = mX2, mname = "Mt interacción PACTO * INDH")
+summary(mc2$glm)
+
+resultados <- rbind(mc1$results, mc2$results)
+resultados <- resultados %>% as.tibble() %>%
+  mutate(IC_inf = abundance - 1.96 * stderr,
+         IC_sup = abundance + 1.96 * stderr,
+         Modelo = c(1, 2),
+         Modelo = factor(Modelo, labels = c("Sin interación", "Interacción PACTO * INDH"))) %>%
+  select(Modelo, "Estimación" = abundance, SE = stderr, "IC lim. inf." = IC_inf, "IC. lim. sup" = IC_sup)
+resultados %>%
+  rempsyc::nice_table(
+    title = "Tabla 1: Estimación poblacional de las víctimas de violaciones de derechos humanos con resultado de trauma ocular a partir de modelos loglineáles",
+    note = c("", 
+             "El tamaño poblacional fue estimado a través una regresión de Poisson que considera la presencia y ausencia de víctimas en los tres listados: PVI, PACTO e INDH.",
+             "El modelo de interacción controla la dependencia de los listados PACTO e INDH, ya que en ambos registros existen víctimas catastradas en el mismo espacio-tiempo.",
+             "Los límites superiores e inferiores del intervalo de cada estimación fueron calculados para un 95% de confianza.")
+  )
+
+anova(modelos$glm$M0,
+      mc1$glm,
+      mc2$glm, test = "Chisq") %>%
+  broom::tidy() %>%
+  mutate(term = c("Modelo nulo", "Modelo simple", "Modelo interacción")) %>%
+  rempsyc::nice_table(title = "Significancia de los modelos poblacionales por Análisis de Varianza (ANOVA)",
+                      note = c("", "El contraste de varianza entre los modelos se hizo a través de la prueba Chi-cuadrado de una cola"))
+
+modelsummary::modelsummary(
+  list("Modelo simple" = mc1$glm,
+       "Modelo interacción" = mc2$glm),
+  stars = T, output = "flextable", title = "Coeficientes (en log odds) de los modelos poblacionales de víctimas de violaciones de derechos humanos con resultado de trauma ocular") %>%
+  flextable::theme_apa()
+
+ggplot(resultados, aes(x = Modelo, y = Estimación)) +
+  geom_point(color = "red") +
+  geom_errorbar(aes(ymin = `IC lim. inf.`, ymax = `IC. lim. sup`), width = 0.2, color = "darkblue") +
+  labs(x = "Modelo", y = "Población estimada", caption = "Nota: Intervalo estimado en un 95% de confianza") +
+  theme_minimal()
 
 
-library(SparseMSE)
-estimatepopulation(historial_capturas, nboot = 1000, pthresh = 0.02,
-                   alpha = c(0.01, 0.05, 0.1))
-checkident(historial_capturas, mX = NULL, verbose = T)
-
-descriptive(to_consolidado[,-1], dfreq = T, dtype=c("hist","nbcap"))
-
-modelos <- Rcapture::closedp(
-  to_consolidado[,-1]
-)
-
-modelos <- as.data.frame(modelos$results)
-
-historial_capturas
-
-closedp.bc(to_consolidado[,-1], m=c("M0","Mbh"))
+modelos$parameters
